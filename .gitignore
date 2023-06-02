@@ -1,0 +1,7 @@
+/work_dir
+/__pycache__
+/data
+/.vscode
+*__pycache__*
+/.ipynb_checkpoints
+/model_zoo
