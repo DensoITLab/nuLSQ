@@ -32,8 +32,9 @@ def create_model(args):
         print('Model architecture `%s` for `%s` dataset is not supported' % (args.model, args.dataset_name))
         exit(-1)
 
-    msg = 'Created `%s` model for `%s` dataset' % (args.model, args.dataset_name)
-    msg += '\n          Use pre-trained model = %s' % args.pre_trained
-    print(msg)
+    if args.info_outputs:
+        msg = 'Created `%s` model for `%s` dataset' % (args.model, args.dataset_name)
+        msg += '\n          Use pre-trained model = %s' % args.pre_trained
+        print(msg)
 
     return model

@@ -183,7 +183,8 @@ def run_one_epoch(net, dataloader, optimizer, soptimizer, criterion, epoch, mode
             torch.save(grad_LSQ_w, os.path.join(args.save_path, 'grad_LSQ_w.pt'))
             torch.save(grad_LSQ_x, os.path.join(args.save_path, 'grad_LSQ_x.pt'))
     if args.write_log and accuracy > best_acc and mode != 'train':
-        print('Saving..')
+        if args.info_outputs:
+            print('Saving..')
         save_ckp(net, None, None, best_acc, epoch, best_acc, filename=os.path.join(args.save_path, 'best.pth'))
         best_acc = accuracy
     return accuracy, avg_loss
@@ -221,8 +222,8 @@ def run_test(args):
 def run_train(args):
     global best_acc
     start_epoch = 0
-    
-    print('==> Preparing training for {0}..'.format(args.dataset_name))
+    if args.info_outputs:      
+        print('==> Preparing training for {0}..'.format(args.dataset_name))
     assert args.dataset_name == "cifar" or args.dataset_name == "imagenet"
     if args.dataset_name == 'cifar':
         cifar_config(args)
@@ -258,13 +259,13 @@ def run_train(args):
     else:
 
         # args.ex_name = '{0}/{0}_{1}bit_{2}_{3}_lr{4}_wd_{5}_{6}_w_{7}_x_{8}_{9}_w_{10}bit_first_symmetric_{11}_Logcosh_init_last_{12}_-{13}'\
-        args.ex_name = '{0}/first_{12}_last_{13}/{0}_{1}bit_{2}_{3}_lr{4}_wd{5}_slr{6}_{7}_w_{8}_x_{9}_{10}_w_{11}bit_first_symmetric_{12}_last_{13}_-{14}'\
+        args.ex_name = 'speed_check/{0}/first_{12}_last_{13}/{0}_{1}bit_{2}_{3}_lr{4}_wd{5}_slr{6}_{7}_w_{8}_x_{9}_{10}_w_{11}bit_first_symmetric_{12}_last_{13}_epoch{14}-{15}'\
             .format(args.model, str(args.num_bits), name_optimizer, args.lr_scheduler, \
                     str(args.lr), str(args.weight_decay), \
                         str(args.step_size_lr ), name_wd_for_scale, \
                         args.w_grad_scale_mode,  args.x_grad_scale_mode, name_action, \
                             str(args.first_last_num_bits), args.quant_mode_at_first_layer, \
-                                args.quant_mode_at_last_layer, str(args.train_id))
+                                args.quant_mode_at_last_layer, args.nepochs, str(args.train_id))
         # args.ex_name = '{0}_{1}bit_{2}_{3}_lr{4}_{5}_w_{6}_x_{7}_{8}_wo_correction_factor-{9}'.format(args.model, str(args.num_bits), args.optimizer, args.lr_scheduler, str(args.lr),name_wd_for_scale, args.w_grad_scale_mode,  args.x_grad_scale_mode, name_action, str(args.train_id))
     print(args.quant_mode)
     args.save_path = os.path.join(args.save_path, args.dataset_name, args.quant_mode, args.ex_name)
@@ -274,12 +275,14 @@ def run_train(args):
         writer = SummaryWriter(os.path.join(args.save_path, 'tf_log'))
     assert net != None
     
-    print (net)
-    print ("Number of learnable parameters: ", sum(p.numel() for p in net.parameters() if p.requires_grad) / 1e6, "M")   
-    time.sleep(5)
+    if args.info_outputs:
+        print (net)
+        print ("Number of learnable parameters: ", sum(p.numel() for p in net.parameters() if p.requires_grad) / 1e6, "M")   
+        time.sleep(5)
     
     if args.quant_mode != 'real':
-        print("==> Replacing model parameters..")
+        if args.info_outputs:
+            print("==> Replacing model parameters..")
         replacement_dict = {
                             nn.Conv2d : partial(Q.QConv2d, quant_mode=args.quant_mode, num_bits=args.num_bits, w_grad_scale_mode = args.w_grad_scale_mode, x_grad_scale_mode = args.x_grad_scale_mode), 
                             nn.Linear: partial(Q.QLinear, quant_mode=args.quant_mode, num_bits=args.num_bits, w_grad_scale_mode = args.w_grad_scale_mode, x_grad_scale_mode = args.x_grad_scale_mode)}
@@ -299,11 +302,12 @@ def run_train(args):
 
     net = net.to(args.device)
 
-            
-    print('==> Performing action: ', args.action)
+    if args.info_outputs:              
+        print('==> Performing action: ', args.action)
     if args.action == 'load':
         if args.init_from and os.path.isfile(args.init_from):
-            print('==> Initializing from checkpoint: ', args.init_from)
+            if args.info_outputs:
+                print('==> Initializing from checkpoint: ', args.init_from)
             checkpoint = torch.load(args.init_from)
             loaded_params = {}
             for k,v in checkpoint.items():
@@ -347,7 +351,7 @@ def run_train(args):
                         print(m.w_scale)
             # stepsize_init(net, dataloader, 'train', args.device)
         elif args.quant_mode == "LSQ_non_uniform_only_activation" or args.quant_mode ==  "LSQ_non_uniform_only_activation_fast" \
-                or args.quant_mode ==  "LSQ_non_uniform_only_activation_fast_auto_grad" or args.quant_mode == "LSQ_non_uniform_non_local_only_activation" \
+                or args.quant_mode ==  "LSQ_non_uniform_only_activation_auto_grad" or args.quant_mode == "LSQ_non_uniform_non_local_only_activation" \
                 or args.quant_mode == "LSQ_non_uniform_non_local_only_activation_II" or args.quant_mode == "LSQ_non_uniform_non_local_only_activation_III" \
                 or args.quant_mode == "LSQ_non_uniform_non_local_only_activation_IV" or args.quant_mode == "LSQ_non_uniform_non_local_only_activation_V"  \
                     or args.quant_mode == "check_LSQ_non_uniform_non_local_only_activation":
@@ -436,7 +440,7 @@ def run_train(args):
    
     for epoch in range(start_epoch, args.nepochs):
         train_accuracy, train_loss = run_one_epoch(net, dataloader, optimizer, soptimizer, criterion, epoch, "train", args)
-        val_accuracy,   val_loss   = run_one_epoch(net, dataloader, optimizer, soptimizer, criterion, epoch, "test",   args)
+        # val_accuracy,   val_loss   = run_one_epoch(net, dataloader, optimizer, soptimizer, criterion, epoch, "test",   args)
         val_accuracy,   val_loss   = run_one_epoch(net, dataloader, optimizer, soptimizer, criterion, epoch, "val",   args)
         print("[Train] Epoch=", epoch, 'train_Loss: %.3f, train_Acc: %.3f' % (train_loss.item(), train_accuracy), '  |  ', 'val_Loss: %.3f, val_Acc: %.3f' % (val_loss.item(), val_accuracy))
         # update learning rate by scheduler
@@ -446,18 +450,12 @@ def run_train(args):
         
         if args.write_log:
             
-            sheet1.write(epoch+1, 0, train_accuracy)
-            sheet1.write(epoch+1, 1, train_loss.item())
-            sheet1.write(epoch+1, 2, val_accuracy)
-            sheet1.write(epoch+1, 3, val_loss.item())
-
             writer.add_scalar("loss/1.train",     train_loss,     epoch)
             writer.add_scalar("loss/2.val",       val_loss,       epoch)
             writer.add_scalar("accuracy/1.train", train_accuracy, epoch)
             writer.add_scalar("accuracy/2.val",   val_accuracy,   epoch)
 
             save_ckp(net, scheduler, optimizer, best_acc, epoch, val_accuracy, filename=os.path.join(args.save_path, 'ckpt.pth'))
-            wb.save(os.path.join(args.save_path, 'log_' + str(args.train_id) + '.xls'))
             for idx, (name, m) in enumerate(net.named_modules()):
                 # print(name, type(m))
                 # if name in ['features.init_block', 'output', 'features.init_block.conv']:
@@ -488,7 +486,7 @@ def run_train(args):
                             w_scale = {'s[0]': np.log(1 + np.exp(m.w_scale.cpu()))}
                             x_scale = {'s[0]': np.log(1 + np.exp(m.x_scale.cpu()))}
                         elif args.quant_mode == 'LSQ_non_uniform_only_activation' or args.quant_mode ==  "LSQ_non_uniform_only_activation_fast" \
-                            or args.quant_mode == 'LSQ_non_uniform_only_activation_fast_auto_grad' \
+                            or args.quant_mode == 'LSQ_non_uniform_only_activation_auto_grad' \
                             or args.quant_mode == 'LSQ_non_uniform_non_local_only_activation' \
                             or args.quant_mode == 'LSQ_non_uniform_non_local_only_activation_II' \
                             or args.quant_mode == 'LSQ_non_uniform_non_local_only_activation_III' \
@@ -523,21 +521,23 @@ def run_train(args):
 
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
+if True :    
     time_sta = time.time()
     global args, best_acc
+    # print(args.quant_mode)
     parser = define_args()
     args = parser.parse_args()
+    # args = parser.parse_args(args=[])    
     best_acc = 0
     # dataloaders = imagenet_dataloaders(128, None, None, None, 8)
     # setup device
     
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Device:", args.device)
+    if args.info_outputs:
+        print("Device:", args.device)
     
     args.train_id = 2
-    args.num_bits = 4
-    args.first_last_num_bits = 2
     # args.enable_warmup = True
     args.enable_warmup = False # for 8bits
 
@@ -550,21 +550,7 @@ if __name__ == '__main__':
     args.lr = 0.01
     # args.lr = 0.001 # for 8bits
     # args.lr = 0.001 # for DEBUG MODE
-    # args.quant_mode = 'floorLSQ'
-    # args.quant_mode = 'LSQ'
-    # args.quant_mode = 'W_floorLSQ_A_LSQ'
-    
-    # args.quant_mode = 'floorLSQ'
-    # args.quant_mode = 'LSQ_non_uniform_both_activation_weight'
-    # args.quant_mode = 'LSQ_non_uniform_only_activation'
-    args.quant_mode =  "LSQ_non_uniform_only_activation_fast"    
-    # args.quant_mode =  "LSQ_non_uniform_only_activation_fast_auto_grad"    
-    # args.quant_mode = 'LSQ_non_uniform_non_local_only_activation'
-    # args.quant_mode = 'LSQ_non_uniform_non_local_only_activation_V'
-    # args.quant_mode = 'LSQ_non_uniform_non_local_only_activation_IV'
-    # args.quant_mode = 'LSQ_non_uniform_non_local_only_activation_III'
-    # args.quant_mode = 'LSQ_non_uniform_non_local_only_activation_II'
-    # args.quant_mode = 'check_LSQ_non_uniform_non_local_only_activation'
+    args.first_last_num_bits = 2
     args.quant_mode_at_first_layer = "real"
     # args.quant_mode_at_first_layer = "LSQ_first_layer"
     # args.quant_mode_at_first_layer = "shiftLSQ_first_layer"
@@ -587,7 +573,7 @@ if __name__ == '__main__':
     # Path to the pre-train model
     args.action = 'load'
     # args.action = 'progressive_quantization'
-    args.progressive_bits = 3
+    # args.progressive_bits = 3
     if args.dataset_name == 'imagenet' and args.action == 'load':
         imagenet_config(args)
         if args.model == 'preresnet18':
@@ -600,18 +586,6 @@ if __name__ == '__main__':
         cifar_config(args)
         args.init_from = 'model_zoo/preresnet20_cifar100-3022-3dbfa6a2.pth'
     elif args.dataset_name == 'cifar' and args.action == 'progressive_quantization':
-        # correctionなし
-        # load_name = '{0}_{1}bit_{2}_{3}_lr{4}_{5}_w_{6}_x_{7}-{8}_wo_correction_factor'.format(args.model, str(args.num_bits), args.optimizer, args.lr_scheduler, str(args.lr),name_wd_for_scale, args.w_grad_scale_mode,  args.x_grad_scale_mode, str(args.train_id))
-        # load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnealing_lr0.001_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_float_model_wo_correction_factor-2'.format(args.progressive_bits)
-        # load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnealing_lr0.001_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_8bits_progressive_quantion_wo_correction_factor-2'.format(args.progressive_bits)
-        # load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnealing_lr0.001_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_6bits_progressive_quantion_wo_correction_factor-2'.format(args.progressive_bits)
-        # load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnea
-        # ling_lr0.001_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_4bits_progressive_quantion_wo_correction_factor-2'.format(args.progressive_bits)
-        # correctionあり
-        # load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnealing_lr0.001_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_float_model-2'.format(args.progressive_bits)
-        # load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnealing_lr0.01_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_float_model-2'.format(args.progressive_bits)
-        # load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnealing_lr0.001_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_8bits_progressive_quantion-2'.format(args.progressive_bits)
-        # load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnealing_lr0.001_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_6bits_progressive_quantion-2'.format(args.progressive_bits)
         load_name = 'preresnet20_cifar100_{}bit_SGD_CosineAnnealing_lr0.001_wo_wd_for_scale_w_LSQ_grad_scale_x_LSQ_grad_scale_from_4bits_progressive_quantion-2'.format(args.progressive_bits)
         load_quant_mode = 'LSQ_non_uniform_only_activation'
         args.init_from = 'work_dir/{0}/{1}/{2}/ckpt.pth'.format(args.dataset_name,load_quant_mode,load_name)        
@@ -628,17 +602,9 @@ if __name__ == '__main__':
         run_test(args)
     else:
         run_train(args)
-        # for i in [8,6,4,2]:
-        # for i in [2,4,6,8]:
-        # for i in [4,6,8]:
-        #     # if  i ==8:
-        #     #     args.lr = 0.001
-        #     args.first_last_num_bits = i
-        #     print("first_layer_bits=", args.first_last_num_bits)
-        #     run_train(args)
-    print('finished')
     time_end = time.time()
     tim = time_end-time_sta
-    print("mode:", args.quant_mode, ", time=", tim)
+    print("time=", tim)
+    print('finished')
 
         # run test for the pre-trained model

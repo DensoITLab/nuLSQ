@@ -18,43 +18,26 @@ def _quantize_LSQ(x, scale, Qn, Qp, num_elements,grad_scale_mode):
     Qn_on_device = torch.tensor([Qn], dtype=torch.float).to(x.device)
     Qp_on_device = torch.tensor([Qp], dtype=torch.float).to(x.device)
     assert scale > 0, 'scale = {}, {}, {}'.format(scale, Qn_on_device, Qp_on_device)
-    #if scale < 0:
-        #scale = (-1*scale).detach()
-        #print('scale = {}'.format(scale))
     
     # gradient scaling
     if num_elements > 0:
         if grad_scale_mode == "wo_grad_scale":
             grad_scale = torch.tensor(1.0).to(x.device)
-            # print(grad_scale)
         elif grad_scale_mode == "10_fac":
             grad_scale = torch.tensor(10.0).to(x.device)
-            # print(grad_scale)
         elif grad_scale_mode == "LSQ_grad_scale":
             grad_scale = 1.0 / torch.sqrt(num_elements * Qp_on_device) 
         elif grad_scale_mode == "10dfac_LSQ_grad_scale":
             grad_scale = 1.0 / (10*torch.sqrt(num_elements * Qp_on_device) )
-        #grad_scale = 1.0
-        # default gradient scaling for LSQ
+
         bw_scale   = scale * grad_scale
-        
-        # gradient scaling for exp LSQ & softplus LSQ
-        #grad_alpha = (grad_scale / ((torch.exp(scale))**2 + 0.01)).detach()
-        #grad_alpha = (grad_scale / ((torch.exp(scale)) / (torch.exp(scale) + 1))**2).detach()
-        #print(grad_alpha, torch.exp(scale))
-        #bw_scale   = scale * grad_alpha
-        
         scale      = (scale - bw_scale).detach() + bw_scale
-    #x  = x / torch.exp(scale)
-    #x  = x / torch.log(1 + torch.exp(scale))
     x  = x / scale
     
     x  = torch.min(torch.max(x, -Qn_on_device), Qp_on_device)
     xq = torch.round(x)
     y  = (xq - x).detach() + x
     
-    #y  = torch.exp(scale) * y
-    #y  = torch.log(1 + torch.exp(scale)) * y
     y  = scale * y
 
     return y
@@ -68,18 +51,13 @@ def _quantize_floorLSQ(x, scale, Qn, Qp, num_elements,grad_scale_mode):
     Qn_on_device = torch.tensor([Qn], dtype=torch.float).to(x.device)
     Qp_on_device = torch.tensor([Qp], dtype=torch.float).to(x.device)
     assert scale > 0, 'scale = {}, {}, {}'.format(scale, Qn_on_device, Qp_on_device)
-    #if scale < 0:
-        #scale = (-1*scale).detach()
-        #print('scale = {}'.format(scale))
     
     # gradient scaling
     if num_elements > 0:
         if grad_scale_mode == "wo_grad_scale":
             grad_scale = torch.tensor(1.0).to(x.device)
-            # print(grad_scale)
         elif grad_scale_mode == "10_fac":
             grad_scale = torch.tensor(10.0).to(x.device)
-            # print(grad_scale)
         elif grad_scale_mode == "LSQ_grad_scale":
             grad_scale = 1.0 / torch.sqrt(num_elements * Qp_on_device) 
         elif grad_scale_mode == "floorLSQ_grad_scale":
@@ -90,25 +68,18 @@ def _quantize_floorLSQ(x, scale, Qn, Qp, num_elements,grad_scale_mode):
             grad_scale = 1.0 / (num_elements * Qp_on_device)
         elif grad_scale_mode == "floorLSQ_grad_scale_square":
             grad_scale = 1.0 / (num_elements * Qp_on_device)**2 
-        # print(grad_scale)
-        #grad_scale = 1.0
-        # default gradient scaling for LSQ
-        # print(scale)
+
         bw_scale   = scale * grad_scale        
         scale      = (scale - bw_scale).detach() + bw_scale
-    #x  = x / torch.exp(scale)
-    #x  = x / torch.log(1 + torch.exp(scale))
     x  = x / scale 
     
     x  = torch.min(torch.max(x-1/2, -Qn_on_device ), Qp_on_device )
-    # xq = torch.floor(x)
     xq = torch.round(x )
     y  = (xq - x).detach() + x
     flag   = (x < Qp_on_device) &  (x > -Qn_on_device)
     
     y  = scale * y  - 1/2 * (scale*flag).detach() + 1/2 * scale * flag
     # y  = scale * y  
-    # print(torch.max(y),torch.min(y))
 
     return y
 
@@ -120,26 +91,18 @@ def _quantize_ceilLSQ(x, scale, Qn, Qp, num_elements,grad_scale_mode):
     Qn_on_device = torch.tensor([Qn], dtype=torch.float).to(x.device)
     Qp_on_device = torch.tensor([Qp], dtype=torch.float).to(x.device)
     assert scale > 0, 'scale = {}, {}, {}'.format(scale, Qn_on_device, Qp_on_device)
-    #if scale < 0:
-        #scale = (-1*scale).detach()
-        #print('scale = {}'.format(scale))
     
     # gradient scaling
     if num_elements > 0:
         if grad_scale_mode == "wo_grad_scale":
             grad_scale = torch.tensor(1.0).to(x.device)
-            # print(grad_scale)
         elif grad_scale_mode == "10_fac":
             grad_scale = torch.tensor(10.0).to(x.device)
-            # print(grad_scale)
         elif grad_scale_mode == "LSQ_grad_scale":
             grad_scale = 1.0 / torch.sqrt(num_elements * Qp_on_device) 
-        #grad_scale = 1.0
-        # default gradient scaling for LSQ
         bw_scale   = scale * grad_scale        
         scale      = (scale - bw_scale).detach() + bw_scale
-    #x  = x / torch.exp(scale)
-    #x  = x / torch.log(1 + torch.exp(scale))
+
     x  = x / scale
     
     x  = torch.min(torch.max(x, -Qn_on_device), Qp_on_device)
@@ -147,9 +110,6 @@ def _quantize_ceilLSQ(x, scale, Qn, Qp, num_elements,grad_scale_mode):
     y  = (xq - x).detach() + x
     
     y  = scale * y 
-    print(torch.max(y),torch.min(y))
-    # assert torch.max(y) <2 , 'y, scale, xq = {}'.format(y, scale, xq)
-    # y  = scale * y  + 1/2 * scale.detach() - 1/2 * scale
 
     return y
 
@@ -162,12 +122,8 @@ def _quantize_SoftPlus_LSQ(x, scale, Qn, Qp, num_elements):
     # gradient scaling
     if num_elements > 0:
         grad_scale = 1.0 / torch.sqrt(num_elements * Qp_on_device) 
-        #grad_scale = 1.0
-        
-        # gradient scaling for exp LSQ & softplus LSQ
-        #grad_alpha = (((torch.exp(scale)) / (torch.exp(scale) + 1)) * grad_scale).detach()
+
         grad_alpha = 0.01
-        #print(grad_alpha, torch.exp(scale))
         bw_scale   = scale * grad_scale * grad_alpha
         
         scale      = (scale - bw_scale).detach() + bw_scale 
@@ -187,12 +143,9 @@ def _quantize_Exp_LSQ(x, scale, Qn, Qp, num_elements):
     
     # gradient scaling
     if num_elements > 0:
-        # grad_scale = 1.0 / torch.sqrt(num_elements * Qp_on_device) 
-        grad_scale = 1.0
-        
+        grad_scale = 1.0        
         # gradient scaling for exp LSQ & softplus LSQ
         grad_alpha = (grad_scale / ((torch.exp(scale))**2 + 0.01)).detach()
-        #print(grad_alpha, torch.exp(scale))
         bw_scale   = scale * grad_alpha
         
         scale      = (scale - bw_scale).detach() + bw_scale 
@@ -233,23 +186,12 @@ def _quantize_shiftLSQ(x, b, scale, Qn, Qp, num_elements,grad_scale_mode):
         # default gradient scaling for LSQ
         bw_scale   = scale * grad_scale
         
-        # gradient scaling for exp LSQ & softplus LSQ
-        #grad_alpha = (grad_scale / ((torch.exp(scale))**2 + 0.01)).detach()
-        #grad_alpha = (grad_scale / ((torch.exp(scale)) / (torch.exp(scale) + 1))**2).detach()
-        #print(grad_alpha, torch.exp(scale))
-        #bw_scale   = scale * grad_alpha
-        
         scale      = (scale - bw_scale).detach() + bw_scale
-    #x  = x / torch.exp(scale)
-    #x  = x / torch.log(1 + torch.exp(scale))
     x  = (x - b) / scale
     
     x  = torch.min(torch.max(x, -Qn_on_device), Qp_on_device)
     xq = torch.round(x)
     y  = (xq - x).detach() + x
-    
-    #y  = torch.exp(scale) * y
-    #y  = torch.log(1 + torch.exp(scale)) * y
     y  = scale * y + b
 
     return y
@@ -268,7 +210,6 @@ class _quantize_LSQ_non_uniform_act_core(torch.autograd.Function):
         for s in scale:
             assert s > 0, 'scale = {}'.format(scale)
         if num_elements > 0:
-            # grad_scale = 1.0 / torch.sqrt(torch.tensor(num_elements * (num_levels - 1), dtype=torch.float))
             if x_grad_scale_mode == "wo_grad_scale":
                 grad_scale = torch.tensor(1.0).to(x.device)
             elif x_grad_scale_mode == "LSQ_grad_scale" or x_grad_scale_mode == "nuLSQ_grad_scale":
@@ -279,9 +220,6 @@ class _quantize_LSQ_non_uniform_act_core(torch.autograd.Function):
                 print("Not implemented:", x_grad_scale_mode)
         else:
             grad_scale = torch.tensor(1.0).to(x.device)
-
-        # num_elements = torch.tensor(num_elements).to(x.device)
-        # ctx.save_for_backward(x, scale, num_elements)
 
         y = torch.zeros_like(x)
         Ns_x = torch.zeros_like(scale)
@@ -296,14 +234,13 @@ class _quantize_LSQ_non_uniform_act_core(torch.autograd.Function):
             ratio = Ns_x/(Ns_x.sum())
         else:
             ratio = torch.ones_like(scale) 
-        # ctx.Ns_x = Ns_x
         ctx.save_for_backward(x, scale, grad_scale, ratio )
         return y, Ns_x
 
     @staticmethod
     def backward(ctx, dLdy, temp_Ns_x):
         x, scale, grad_scale, ratio= ctx.saved_tensors
-        # x, scale, num_elements = ctx.saved_tensors
+        
         num_levels = torch.numel(scale) + 1
         # cum_scale = scale.cumsum(dim=0).tolist()
         # N_w = (x > 0).float().sum()
@@ -341,18 +278,12 @@ class _quantize_LSQ_non_uniform_act_core(torch.autograd.Function):
                 cumsum_scale1 += scale[i+0]
                 cumsum_scale2 += scale[i+1]
                 
-#             dLds[i] = (dLdy * dyds).sum().view(-1) * (1.0 / torch.sqrt((N_s/N_w) * (num_levels-1))) * torch.sqrt(torch.tensor((num_levels - 1), dtype=torch.float))
-#             dLds[i] = (dLdy * dyds).sum().view(-1)
             dLds[i] = (dLdy * dyds).sum().view(-1) * grad_scale
-            #print(i, (1.0 / torch.sqrt(N_s * (num_levels-1))))
-            # dLds[i] = (dLdy * dyds).sum().view(-1) * (1.0 / torch.sqrt(num_elements * (N_s/N_w)))
-#             dLds[i] = (dLdy * dyds).sum().view(-1) * (1.0 / torch.sqrt((N_s/N_w) * (num_levels-1)))
 
         return dLdy * dydx, dLds, None, None, None
 
 
 def _quantize_LSQ_non_uniform_act(x, scale, num_bits, num_elements, x_grad_scale_mode):
-    # Note: This function assumes x >= 0. Therefore, only available for activations not for weights.
     func = _quantize_LSQ_non_uniform_act_core.apply
     return func(x, scale, num_bits, num_elements, x_grad_scale_mode)
 
@@ -370,7 +301,6 @@ class _quantize_LSQ_non_uniform_fast_act_core(torch.autograd.Function):
         for s in scale:
             assert s > 0, 'scale = {}'.format(scale)
         if num_elements > 0:
-            # grad_scale = 1.0 / torch.sqrt(torch.tensor(num_elements * (num_levels - 1), dtype=torch.float))
             if x_grad_scale_mode == "wo_grad_scale":
                 grad_scale = torch.tensor(1.0).to(x.device)
             elif x_grad_scale_mode == "LSQ_grad_scale" or x_grad_scale_mode == "nuLSQ_grad_scale":
@@ -382,27 +312,12 @@ class _quantize_LSQ_non_uniform_fast_act_core(torch.autograd.Function):
         else:
             grad_scale = torch.tensor(1.0).to(x.device)
 
-        # num_elements = torch.tensor(num_elements).to(x.device)
-        # ctx.save_for_backward(x, scale, num_elements)
-
         y = torch.zeros_like(x)
         Ns_x = torch.zeros_like(scale)
         cumsum_scale = torch.tensor([0], dtype=torch.float).to(x.device)
-        split_flag_list = []
         for i in range(num_levels-1):
-            # tmp = torch.min(torch.max(torch.round((x - cumsum_scale)/scale[i]),q_0),q_1)
-            # y      +=  scale[i] * tmp
-            # # split_flag_list.append(tmp.unsqueeze(dim=-1))
-            # # y      +=  scale[i] * torch.min(torch.max(torch.round((x - cumsum_scale)/scale[i]),q_0),q_1)
-
             offset  = cumsum_scale + scale[i]/2
             y      +=  (x > offset).float() * scale[i]
-
-            # tmp = (x - cumsum_scale)/scale[i]            
-            # tmp = torch.min(torch.max(tmp,q_0),q_1)
-            # xq = torch.round(tmp)
-            # y      +=  ((xq - tmp) + tmp) * scale[i]
-
             Ns_x[i] = ((x > cumsum_scale) & (x < cumsum_scale + scale[i])).float().sum()
             cumsum_scale += scale[i]
             # assert Ns_x[i] > 0, '(i, scale, Ns_x) = {}, {}, {}'.format(i, scale, Ns_x[i])
@@ -410,21 +325,13 @@ class _quantize_LSQ_non_uniform_fast_act_core(torch.autograd.Function):
             ratio = Ns_x/(Ns_x.sum())
         else:
             ratio = torch.ones_like(scale) 
-        # ctx.Ns_x = Ns_x
-        # split_flag = torch.cat(split_flag_list, -1)
-        # ctx.save_for_backward(x, split_flag, scale, grad_scale, ratio )
         ctx.save_for_backward(x, scale, grad_scale, ratio )
         return y, Ns_x
 
     @staticmethod
     def backward(ctx, dLdy, temp_Ns_x):
-        # x, split_flag, scale, grad_scale, ratio= ctx.saved_tensors
         x, scale, grad_scale, ratio= ctx.saved_tensors
-        # x, scale, num_elements = ctx.saved_tensors
         num_levels = torch.numel(scale) + 1
-        # cum_scale = scale.cumsum(dim=0).tolist()
-        # N_w = (x > 0).float().sum()
-        # N_s = ((x > 0) & (x < cum_scale[0])).float().sum()
         
         threshold = scale.sum()
         flag_high   = x > threshold
@@ -438,15 +345,8 @@ class _quantize_LSQ_non_uniform_fast_act_core(torch.autograd.Function):
         cumsum_scale2 = scale[0].clone()
         
         for i in range(num_levels-1):
-            # if i > 0:
-            #     N_s = ((x >= cum_scale[i-1]) & (x < cum_scale[i])).float().sum()
             flag_body  = (cumsum_scale1 < x) & (x < cumsum_scale2)
-            # flag_body  = flag_middle
-
-            # shift_x = x - cumsum_scale1
             shift_x = x - cumsum_scale1
-            # d1 = torch.heaviside(shift_x - scale[i]/2, torch.tensor(0.0, dtype=torch.float).to(x.device))
-            # d1 = split_flag[...,i]
             d2 = -shift_x / scale[i]
             d1 = torch.round(-d2)
             d  = d1 + d2  
@@ -466,7 +366,6 @@ class _quantize_LSQ_non_uniform_fast_act_core(torch.autograd.Function):
 
 
 def _quantize_LSQ_non_uniform_fast_act(x, scale, num_bits, num_elements, x_grad_scale_mode):
-    # Note: This function assumes x >= 0. Therefore, only available for activations not for weights.
     func = _quantize_LSQ_non_uniform_fast_act_core.apply
     return func(x, scale, num_bits, num_elements, x_grad_scale_mode)
 
@@ -475,7 +374,7 @@ def _quantize_LSQ_non_uniform_fast_act(x, scale, num_bits, num_elements, x_grad_
 # LSQ (non uniform fast test autograd version for activation)
 #----------------------------------------------------------
 
-def _quantize_LSQ_non_uniform_fast_autograd_act(x, scale, num_bits, num_elements, x_grad_scale_mode):
+def _quantize_LSQ_non_uniform_autograd_act(x, scale, num_bits, num_elements, x_grad_scale_mode):
 
     num_levels = 2 ** num_bits
     q_0 = torch.tensor(0.0, dtype=torch.float).to(x.device)
@@ -484,7 +383,6 @@ def _quantize_LSQ_non_uniform_fast_autograd_act(x, scale, num_bits, num_elements
     for s in scale:
         assert s > 0, 'scale = {}'.format(scale)
     if num_elements > 0:
-        # grad_scale = 1.0 / torch.sqrt(torch.tensor(num_elements * (num_levels - 1), dtype=torch.float))
         if x_grad_scale_mode == "wo_grad_scale":
             grad_scale = torch.tensor(1.0).to(x.device)
         elif x_grad_scale_mode == "LSQ_grad_scale" or x_grad_scale_mode == "nuLSQ_grad_scale":
@@ -499,15 +397,10 @@ def _quantize_LSQ_non_uniform_fast_autograd_act(x, scale, num_bits, num_elements
     bw_scale   = scale * grad_scale
     scale      = (scale - bw_scale).detach() + bw_scale
 
-    # num_elements = torch.tensor(num_elements).to(x.device)
-    # ctx.save_for_backward(x, scale, num_elements)
-
     y = torch.zeros_like(x)
     Ns_x = torch.zeros_like(scale)
 
-    # cumsum_scale = torch.tensor([0], dtype=torch.float).to(x.device).detach()
     cumsum_scale = torch.cumsum(scale, dim=0) - scale
-    # print(cumsum_scale.size())
     for i in range(num_levels-1):
         tmp = (x - cumsum_scale[i])/scale[i]            
         tmp = torch.min(torch.max(tmp,q_0),q_1)
@@ -524,12 +417,9 @@ def _quantize_LSQ_non_uniform_fast_autograd_act(x, scale, num_bits, num_elements
         #             + torch.min(torch.max((x - cumsum_scale[i])/scale[i],q_0),q_1)) * scale[i]
         Ns_x[i] = ((x > cumsum_scale[i]) & (x < cumsum_scale[i] + scale[i])).float().sum()
         
-        # Ns_x[i] = ((x > cumsum_scale) & (x < cumsum_scale + scale[i])).float().sum()
-        # cumsum_scale = cumsum_scale + scale[i]
         # assert Ns_x[i] > 0, '(i, scale, Ns_x) = {}, {}, {}'.format(i, scale, Ns_x[i])
     if x_grad_scale_mode == "nuLSQ_grad_scale":
         print("Not implemented yet")
-    # ctx.Ns_x = Ns_x
     return y, Ns_x
 
 #----------------------------------------------------------
@@ -1200,7 +1090,6 @@ class _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act_core(torch.autogr
         for s in scale:
             assert s > 0, 'scale = {}'.format(scale)
         if num_elements > 0:
-            # grad_scale = 1.0 / torch.sqrt(torch.tensor(num_elements * (num_levels - 1), dtype=torch.float))
             if x_grad_scale_mode == "wo_grad_scale":
                 grad_scale = torch.tensor(1.0).to(x.device)
             elif x_grad_scale_mode == "LSQ_grad_scale" or x_grad_scale_mode == "nuLSQ_grad_scale":
@@ -1213,9 +1102,6 @@ class _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act_core(torch.autogr
                 print("Not implemented:", x_grad_scale_mode)
         else:
             grad_scale = torch.tensor(1.0).to(x.device)
-
-        # num_elements = torch.tensor(num_elements).to(x.device)
-        # ctx.save_for_backward(x, scale, num_elements)
 
         y = torch.zeros_like(x)
         Ns_x = torch.zeros_like(scale)
@@ -1230,7 +1116,6 @@ class _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act_core(torch.autogr
             ratio = Ns_x/(Ns_x.sum())
         else:
             ratio = torch.ones_like(scale) 
-        # ctx.Ns_x = Ns_x
         ctx.save_for_backward(x, scale, grad_scale, ratio )
         return y, Ns_x
 
@@ -1238,11 +1123,7 @@ class _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act_core(torch.autogr
     def backward(ctx, dLdy, temp_Ns_x):
         x, scale, grad_scale, ratio= ctx.saved_tensors
         # x, scale, num_elements = ctx.saved_tensors
-        num_levels = torch.numel(scale) + 1
-        # cum_scale = scale.cumsum(dim=0).tolist()
-        # N_w = (x > 0).float().sum()
-        # N_s = ((x > 0) & (x < cum_scale[0])).float().sum()
-        
+        num_levels = torch.numel(scale) + 1        
 
         flag_high   = x > scale.sum()
         flag_low    = x < 0
@@ -1254,11 +1135,8 @@ class _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act_core(torch.autogr
         cumsum_scale1 = torch.tensor(0, dtype=torch.float).to(x.device)
         cumsum_scale2 = scale[0].clone()
         cumsum_scale3 = scale.sum()
-        # Ns_tot = ((x > 0 ) & (x< cumsum_scale3)).float().sum()
         flag_upper =  cumsum_scale3 < x
         for i in range(num_levels-1):
-            # if i > 0:
-            #     N_s = ((x >= cum_scale[i-1]) & (x < cum_scale[i])).float().sum()
             flag_body  = (cumsum_scale1 < x) & (x < cumsum_scale2)
 
             shift_x = x - cumsum_scale1
@@ -1275,23 +1153,15 @@ class _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act_core(torch.autogr
                 cumsum_scale1 += scale[i+0]
                 cumsum_scale2 += scale[i+1]
                 
-#             dLds[i] = (dLdy * dyds).sum().view(-1) * (1.0 / torch.sqrt((N_s/N_w) * (num_levels-1))) * torch.sqrt(torch.tensor((num_levels - 1), dtype=torch.float))
-            # dLds[i] = (dLdy * dyds).sum().view(-1)
             dLds_body = (dLdy * dyds_body).sum().view(-1 ) * grad_scale
             dLds[i] = dLds[i] + (dLdy * dyds_upper).sum().view(-1 ) * grad_scale
             for j in range(num_levels-1):
                 dLds[j] = dLds_body + dLds[j]
-                # dLds[j] = (dLdy * dyds).sum().view(-1 ) * grad_scale + dLds[j]
-
-            #print(i, (1.0 / torch.sqrt(N_s * (num_levels-1))))
-            # dLds[i] = (dLdy * dyds).sum().view(-1) * (1.0 / torch.sqrt(num_elements * (N_s/N_w)))
-#             dLds[i] = (dLdy * dyds).sum().view(-1) * (1.0 / torch.sqrt((N_s/N_w) * (num_levels-1)))
 
         return dLdy * dydx, dLds, None, None, None
 
 
 def _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act(x, scale, num_bits, num_elements, x_grad_scale_mode):
-    # Note: This function assumes x >= 0. Therefore, only available for activations not for weights.
     func = _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act_core.apply
     return func(x, scale, num_bits, num_elements, x_grad_scale_mode)
 
@@ -1371,8 +1241,6 @@ def _forward_common(module, input):
     if module.init_state_for_nonuniform_weight == False:
         # step size initialization of LSQ
         dev         = input.device
-        print(module.init_state_for_nonuniform_weight)
-        print(module.mode)
         #w_std, w_mean = torch.std_mean(module.weight, unbiased=False)
         #w_scale = float(torch.max(torch.abs(w_mean-3*w_std),torch.abs(w_mean+3*w_std))/2**(module.num_bits-1))
 
@@ -1385,17 +1253,10 @@ def _forward_common(module, input):
             module.x_scale.data = torch.tensor([x_scale] * num_param_x).to(dev).clone()
             module.w_pos_scale.data = torch.tensor([w_scale] * module.w_Qp ).to(dev).clone()
             module.w_neg_scale.data = torch.tensor([w_scale] * module.w_Qn ).to(dev).clone()
-            # print('Init_x:', module.x_scale)
-            # print('Init_w_neg', module.w_neg_scale)
-            # print('Init_w_pos', module.w_pos_scale)
         else:
             x_scale     = float(2 * input.detach().abs().mean() / math.sqrt(module.x_Qp))
             w_scale     = float(2 * module.weight.detach().abs().mean() / math.sqrt(module.w_Qp))
-            # print(x_scale)
-            # print(torch.max(input.detach()))
-            # print(torch.min(input.detach()))
             # x_scale = utils._find_step_size_by_minimizing_quantization_error(input.detach(), x_scale, module.x_Qn, module.x_Qp, "LogCosh")
-            # print(x_scale)
             # w_scale = _find_step_size_by_minimizing_quantization_error(input.detach(), x_scale.detach(), module.x_Qn, module.x_Qp, "L2")
 
             
@@ -1403,10 +1264,6 @@ def _forward_common(module, input):
             module.x_neg_scale.data = torch.tensor([x_scale] * module.x_Qn ).to(dev).clone()
             module.w_pos_scale.data = torch.tensor([w_scale] * module.w_Qp ).to(dev).clone()
             module.w_neg_scale.data = torch.tensor([w_scale] * module.w_Qn ).to(dev).clone()
-            # print('Init_x:', module.x_pos_scale)
-            # print('Init_x:', module.x_neg_scale)
-            # print('Init_w_neg', module.w_neg_scale)
-            # print('Init_w_pos', module.w_pos_scale)
         
         module.init_state_for_nonuniform_weight.data = torch.tensor(True).to(dev).clone()
     
@@ -1417,28 +1274,17 @@ def _forward_common(module, input):
     elif module.mode == "LSQ":
         # input :     uniform quantization
         # weight:     uniform quantization
-        #print('x', module.x_scale, module.x_scale.grad)
-        #print('w', module.w_scale, module.w_scale.grad)
-        #if module.x_scale.grad() == None or module.w_scale.grad() == None:
-        #    pass
-        #else:
-        #    print('x_grad', module.x_scale.grad)
-        #    print('w_grad', module.w_scale.grad)
         input  = _quantize_LSQ(input,         module.x_scale, module.x_Qn, module.x_Qp, input.shape[1],module.x_grad_scale_mode)
         weight = _quantize_LSQ(module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
-        #input = FunLSQ.apply(input,         module.x_scale, module.x_Qn, module.x_Qp, input.shape[1])
-        #weight = FunLSQ.apply(module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel())
     elif module.mode == "LSQ_first_layer":
         input  = _quantize_LSQ(input,         module.x_scale, module.x_Qn, module.x_Qp, input.shape[1],"LSQ_grad_scale")
         weight = _quantize_LSQ(module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),"LSQ_grad_scale")
     elif module.mode == "shiftLSQ_first_layer":
         shift_const = (0.4914 + 0.4822 + 0.4465)/(0.2023 + 0.1994 + 0.2010)
         input  = _quantize_shiftLSQ(input,       shift_const,  module.x_scale, module.x_Qn, module.x_Qp, input.shape[1],"LSQ_grad_scale")
-        weight = _quantize_LSQ(module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),"LSQ_grad_scale")
-        
+        weight = _quantize_LSQ(module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),"LSQ_grad_scale")        
     elif module.mode == "floorLSQ" :
         input  = _quantize_floorLSQ(input,         module.x_scale, module.x_Qn, module.x_Qp, input.numel(),module.x_grad_scale_mode)
-        # input  = _quantize_floorLSQ(input,         module.x_scale, module.x_Qn, module.x_Qp, input.shape[1],module.x_grad_scale_mode)
         weight = _quantize_floorLSQ(module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
     elif module.mode == "ceilLSQ" :
         input  = _quantize_ceilLSQ(input,         module.x_scale, module.x_Qn, module.x_Qp, input.shape[1],module.x_grad_scale_mode)
@@ -1453,21 +1299,15 @@ def _forward_common(module, input):
         input  = _quantize_Exp_LSQ(input,         module.x_scale, module.x_Qn, module.x_Qp, input.shape[1])
         weight = _quantize_Exp_LSQ(module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel())
     elif module.mode == "LSQ_non_uniform_only_activation":
-        # input : non-uniform quantization
-        # weight:     uniform quantization
         input, Ns_x  = _quantize_LSQ_non_uniform_act(input,         module.x_scale, module.num_bits, input.shape[1], module.x_grad_scale_mode)
         weight = _quantize_LSQ            (module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
         module.Ns_x.data += Ns_x
     elif module.mode == "LSQ_non_uniform_only_activation_fast":
-        # input : non-uniform quantization
-        # weight:     uniform quantization
         input, Ns_x  = _quantize_LSQ_non_uniform_fast_act(input,         module.x_scale, module.num_bits, input.shape[1], module.x_grad_scale_mode)
         weight = _quantize_LSQ            (module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
         module.Ns_x.data += Ns_x
-    elif module.mode == "LSQ_non_uniform_only_activation_fast_auto_grad":
-        # input : non-uniform quantization
-        # weight:     uniform quantization
-        input, Ns_x  = _quantize_LSQ_non_uniform_fast_autograd_act(input,         module.x_scale, module.num_bits, input.shape[1], module.x_grad_scale_mode)
+    elif module.mode == "LSQ_non_uniform_only_activation_auto_grad":
+        input, Ns_x  = _quantize_LSQ_non_uniform_autograd_act(input,         module.x_scale, module.num_bits, input.shape[1], module.x_grad_scale_mode)
         weight = _quantize_LSQ            (module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
         module.Ns_x.data += Ns_x
     elif module.mode == "LSQ_non_uniform_non_local_only_activation":
@@ -1487,27 +1327,19 @@ def _forward_common(module, input):
         weight = _quantize_LSQ            (module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
         module.Ns_x.data += Ns_x
     elif module.mode == "LSQ_non_uniform_non_local_only_activation_V":
-        # print( module.x_grad_scale_mode,  module.w_grad_scale_mode)
         input, Ns_x  = _quantize_LSQ_non_uniform_nunlocal_update_V_act(input,         module.x_scale, module.num_bits, input.shape[1], module.x_grad_scale_mode)
         weight = _quantize_LSQ            (module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
         module.Ns_x.data += Ns_x
 
     elif module.mode == "check_LSQ_non_uniform_non_local_only_activation":
-        # input : non-uniform quantization
-        # weight:     uniform quantization
         input, Ns_x  =  _check_mode_quantize_LSQ_non_uniform_nunlocal_update_act(input,         module.x_scale, module.num_bits, input.shape[1], module.x_grad_scale_mode)
-        # input, Ns_x  = _quantize_LSQ_non_uniform_act(input,         module.x_scale, module.num_bits, input.shape[1], module.x_grad_scale_mode)
         weight = _quantize_LSQ            (module.weight, module.w_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
         module.Ns_x.data += Ns_x
 
     elif module.mode == "LSQ_non_uniform_only_weight":
-        # input : uniform quantization
-        # weight: non-uniform quantization
         input  = _quantize_LSQ(input,         module.x_scale, module.x_Qn, module.x_Qp, input.shape[1],module.x_grad_scale_mode, module.x_grad_scale_mode)
         weight = _quantize_LSQ_non_uniform_weight(module.weight,module.w_neg_scale,  module.w_pos_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
     elif module.mode == "LSQ_non_uniform_both_activation_weight":
-        # input : non-uniform quantization
-        # weight: non-uniform quantization
         input  = _quantize_LSQ_non_uniform_act(input,         module.x_scale, module.num_bits, input.shape[1], module.x_grad_scale_mode)
         weight = _quantize_LSQ_non_uniform_weight(module.weight,module.w_neg_scale,  module.w_pos_scale, module.w_Qn, module.w_Qp, module.weight.numel(),module.w_grad_scale_mode)
     elif module.mode == "LSQ_non_uniform_first_layer":
@@ -1572,7 +1404,7 @@ def _init_common(module, mode, num_bits):
 
     elif mode in ["LSQ","floorLSQ", "ceilLSQ", "W_floorLSQ_A_LSQ", "SoftPlus_LSQ", \
                   "Exp_LSQ", "LSQ_x", "LSQ_non_uniform_only_activation", "LSQ_non_uniform_only_activation_fast", \
-                   "LSQ_non_uniform_only_activation_fast_auto_grad", \
+                   "LSQ_non_uniform_only_activation_auto_grad", \
                     "LSQ_non_uniform_non_local_only_activation", "LSQ_non_uniform_non_local_only_activation_II", \
                         "LSQ_non_uniform_non_local_only_activation_III", "LSQ_non_uniform_non_local_only_activation_IV", \
                             "LSQ_non_uniform_non_local_only_activation_V", "LSQ_x_non_uniform_activation",\
@@ -1583,7 +1415,7 @@ def _init_common(module, mode, num_bits):
         module.w_Qn = 2 ** (num_bits-1)
         module.w_Qp = 2 ** (num_bits-1) - 1
         if mode in ["LSQ_non_uniform_only_activation",  "LSQ_non_uniform_only_activation_fast", \
-                    "LSQ_non_uniform_only_activation_fast_auto_grad", "LSQ_x_non_uniform_only_activation", \
+                    "LSQ_non_uniform_only_activation_auto_grad", "LSQ_x_non_uniform_only_activation", \
                     "LSQ_non_uniform_non_local_only_activation","LSQ_non_uniform_non_local_only_activation_II",\
                        "LSQ_non_uniform_non_local_only_activation_III", "LSQ_non_uniform_non_local_only_activation_IV",\
                         "LSQ_non_uniform_non_local_only_activation_V", "check_LSQ_non_uniform_non_local_only_activation"]:
