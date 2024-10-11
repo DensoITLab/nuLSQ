@@ -1,0 +1,41 @@
+action: load
+train_id: null
+dataset_name: cifar10
+model: pytorchcv_preresnet20_cifar10
+nepochs: 300
+batch_size: 128
+optimizer: SGD
+momentum: 0.9
+nesterov: True
+weight_norm: LWN
+lr_scheduler: CosineAnnealing
+warmup_epochs: null
+warmup_lr: null
+
+nworkers: 10
+# Quantizer Settings
+w_first_last_quantizer: null
+x_first_last_quantizer: null
+w_first_last_initializer: null
+x_first_last_initializer: null
+w_first_last_grad_scale_mode: null
+x_first_last_grad_scale_mode: null
+first_bits: 8
+last_bits: 8
+init_num: 1
+w_initializer: null
+x_initializer: null
+w_quantizer: null
+x_quantizer: null
+w_grad_scale_mode: null
+x_grad_scale_mode: null
+# Qparms Optimizer settings
+different_optimizer_mode: True
+step_size_optimizer:  SGD
+pre_trained: False
+evaluation_mode: False
+write_log: True
+ddp: False
+invisible_pgb: False
+save_path: output_LCQ
+save_mode: all_checkpoints
